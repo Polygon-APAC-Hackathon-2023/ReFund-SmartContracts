@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.13;
 
 import "openzeppelin-contracts/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 
 contract Hypercert is ERC1155Supply {
-	uint256 public latestUnusedId;
+    uint256 public latestUnusedId;
     address public owner;
     address public poolAddress;
 
@@ -23,17 +23,16 @@ contract Hypercert is ERC1155Supply {
         uint256 _grantEndTime,
         address indexed _grantOwner,
         uint256[] _grantsByAddress
-        );
-
+    );
 
     // ===========================================================================================================
     // Modifiers
-    modifier onlyPool {
+    modifier onlyPool() {
         require(msg.sender == poolAddress, "Funding Pool only function");
         _;
     }
 
-    modifier onlyOwner {
+    modifier onlyOwner() {
         require(msg.sender == owner, "Owner only function");
         _;
     }
@@ -44,27 +43,39 @@ contract Hypercert is ERC1155Supply {
         owner = msg.sender;
     }
 
-    function createGrant(string calldata _grantName, uint256 _grantEndTime) external returns(uint256 _grantId) {
+    function createGrant(
+        string calldata _grantName,
+        uint256 _grantEndTime
+    ) external returns (uint256 _grantId) {
         grantInfo[latestUnusedId].grantName = _grantName;
         grantInfo[latestUnusedId].grantEndTime = _grantEndTime;
         grantInfo[latestUnusedId].grantOwner = msg.sender;
         grantsByAddress[msg.sender].push(latestUnusedId);
 
-        emit GrantCreated(_grantName, latestUnusedId, _grantEndTime, msg.sender, grantsByAddress[msg.sender]);
+        emit GrantCreated(
+            _grantName,
+            latestUnusedId,
+            _grantEndTime,
+            msg.sender,
+            grantsByAddress[msg.sender]
+        );
 
         return latestUnusedId++;
     }
 
-	// internal and only FundingPool can mint
+    // internal and only FundingPool can mint
     function _mintBatch(
         address to,
         uint256[] memory ids,
         uint256[] memory amounts,
         bytes memory data
     ) internal override onlyPool {
-        for (uint256 i; i < ids.length;) {
-		    require(block.timestamp < grantInfo[ids[i]].grantEndTime, "Round ended");
-		    super._mintBatch(to, ids, amounts, data);
+        for (uint256 i; i < ids.length; ) {
+            require(
+                block.timestamp < grantInfo[ids[i]].grantEndTime,
+                "Round ended"
+            );
+            super._mintBatch(to, ids, amounts, data);
             unchecked {
                 i++;
             }
