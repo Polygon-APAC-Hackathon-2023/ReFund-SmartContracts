@@ -30,20 +30,10 @@ contract FundingPool {
         uint256 indexed _value
     );
 
-    //event to track that funds have been streamed
-    event FundsStreamed(
-        uint256 indexed tokenID,
-        address indexed _from,
-        uint256 indexed _value
-    );
-
-    constructor(address _mockGrantCreate) {
-        mockGrantCreate = IMockGrantCreate(_mockGrantCreate);
+    constructor(address _hypercert) {
+        mockGrantCreate = IMockGrantCreate(_hypercert);
     }
 
     //declare a variable to track the value of funds in donation pool, accept multiple decimal places
     uint256 public donationPoolFunds;
-
-    //declare a variable to track the value of funds in qf pool, accept multiple decimal places
-    uint256 public qfPoolFunds;
 }
