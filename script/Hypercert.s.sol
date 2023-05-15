@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.13;
 
 import "forge-std/Script.sol";
 import "forge-std/console.sol";
@@ -17,7 +17,7 @@ contract HypercertScript is Script {
         address alice = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
         vm.startPrank(alice);
 
-        hypercert.createGrant("Second Grant", block.timestamp +300);
+        hypercert.createGrant("Second Grant", block.timestamp + 300);
         hypercert.latestUnusedId();
         hypercert.grantInfo(1);
 
