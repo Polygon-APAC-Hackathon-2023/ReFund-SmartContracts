@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "lib/openzeppelin-contracts/contracts/token/ERC1155/ERC1155.sol";
 
 contract Hypercert is ERC1155 {
-	uint256 public latestId;
+	uint256 public latestUnusedId;
 
     struct GrantInfo {
         string grantName;
@@ -20,12 +20,12 @@ contract Hypercert is ERC1155 {
     constructor(string memory uri_) ERC1155(uri_){}
 
     function createGrant(string calldata _grantName, uint256 _grantEndTime) external {
-        grantInfo[latestId].grantName = _grantName;
-        grantInfo[latestId].grantEndTime = _grantEndTime;
-        grantInfo[latestId].grantOwner = msg.sender;
+        grantInfo[latestUnusedId].grantName = _grantName;
+        grantInfo[latestUnusedId].grantEndTime = _grantEndTime;
+        grantInfo[latestUnusedId].grantOwner = msg.sender;
         
-        emit GrantCreated(_grantName, latestId, _grantEndTime, msg.sender);
-        latestId++;
+        emit GrantCreated(_grantName, latestUnusedId, _grantEndTime, msg.sender);
+        latestUnusedId++;
     }
 
 	// will change to only Pool.sol can mint

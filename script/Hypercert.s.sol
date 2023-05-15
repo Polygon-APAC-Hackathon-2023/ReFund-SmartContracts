@@ -7,14 +7,22 @@ import "../src/Hypercert.sol";
 
 contract HypercertScript is Script {
     function run() public {
-        uint256 deployerPrivateKey = vm.envUint("PRIV_KEY");
-        vm.broadcast(deployerPrivateKey);
+        vm.broadcast();
 
         Hypercert hypercert = new Hypercert("asd");
         hypercert.createGrant("First Grant!", block.timestamp + 300);
-        hypercert.latestId();
+        hypercert.latestUnusedId();
         hypercert.grantInfo(0);
 
-        vm.stopBroadcast();
+        address alice = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
+        vm.startPrank(alice, alice);
+
+        hypercert.createGrant("Second Grant", block.timestamp +300);
+        hypercert.latestUnusedId();
+        hypercert.grantInfo(1);
+
+        vm.stopPrank();
+
+        hypercert.mint(alice, 0, 1000000000, "");
     }
 }
