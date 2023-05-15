@@ -16,6 +16,7 @@ interface IMockGrantCreate {
 /// @dev This is the contract that will handle operations related to Donation Pool and QF Pool
 
 //TODO: add a control check to ensure only USDC is accepted
+//TODO: add allowance for USDC
 contract FundingPool {
     IMockGrantCreate public mockGrantCreate;
 
