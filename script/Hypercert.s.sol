@@ -15,7 +15,7 @@ contract HypercertScript is Script {
         hypercert.grantInfo(0);
 
         address alice = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
-        vm.startPrank(alice, alice);
+        vm.startPrank(alice);
 
         hypercert.createGrant("Second Grant", block.timestamp +300);
         hypercert.latestUnusedId();
@@ -23,6 +23,8 @@ contract HypercertScript is Script {
 
         vm.stopPrank();
 
-        hypercert.mint(alice, 0, 1000000000, "");
+        hypercert.mint(alice, 0, 1000, "");
+        hypercert.balanceOf(alice, 0);
+        hypercert.totalSupply(0);
     }
 }

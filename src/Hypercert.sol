@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
 pragma solidity ^0.8.20;
 
-import "lib/openzeppelin-contracts/contracts/token/ERC1155/ERC1155.sol";
+import "openzeppelin-contracts/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 
-contract Hypercert is ERC1155 {
+contract Hypercert is ERC1155Supply {
 	uint256 public latestUnusedId;
 
     struct GrantInfo {
@@ -13,8 +13,15 @@ contract Hypercert is ERC1155 {
     }
 
     mapping(uint256 => GrantInfo) public grantInfo;
+    mapping(address => uint256[]) public grantsByAddress;
 
-    event GrantCreated(string _grantName, uint256 indexed _grantId, uint256 _grantEndTime, address indexed _grantOwner);
+    event GrantCreated(
+        string _grantName,
+        uint256 indexed _grantId,
+        uint256 _grantEndTime,
+        address indexed _grantOwner,
+        uint256[] _grantsByAddress
+        );
 	event MintEndTime(uint256 _grantId, uint256 _grantEndTime);
 
     constructor(string memory uri_) ERC1155(uri_){}
@@ -23,8 +30,9 @@ contract Hypercert is ERC1155 {
         grantInfo[latestUnusedId].grantName = _grantName;
         grantInfo[latestUnusedId].grantEndTime = _grantEndTime;
         grantInfo[latestUnusedId].grantOwner = msg.sender;
-        
-        emit GrantCreated(_grantName, latestUnusedId, _grantEndTime, msg.sender);
+        grantsByAddress[msg.sender].push(latestUnusedId);
+
+        emit GrantCreated(_grantName, latestUnusedId, _grantEndTime, msg.sender, grantsByAddress[msg.sender]);
         latestUnusedId++;
     }
 
