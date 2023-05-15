@@ -22,9 +22,5 @@ contract HypercertScript is Script {
         hypercert.grantInfo(1);
 
         vm.stopPrank();
-
-        hypercert.mint(alice, 0, 1000, "");
-        hypercert.balanceOf(alice, 0);
-        hypercert.totalSupply(0);
     }
 }

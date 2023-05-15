@@ -5,6 +5,8 @@ import "openzeppelin-contracts/contracts/token/ERC1155/extensions/ERC1155Supply.
 
 contract Hypercert is ERC1155Supply {
 	uint256 public latestUnusedId;
+    address public owner;
+    address public poolAddress;
 
     struct GrantInfo {
         string grantName;
@@ -22,28 +24,60 @@ contract Hypercert is ERC1155Supply {
         address indexed _grantOwner,
         uint256[] _grantsByAddress
         );
-	event MintEndTime(uint256 _grantId, uint256 _grantEndTime);
 
-    constructor(string memory uri_) ERC1155(uri_){}
 
-    function createGrant(string calldata _grantName, uint256 _grantEndTime) external {
+    // ===========================================================================================================
+    // Modifiers
+    modifier onlyPool {
+        require(msg.sender == poolAddress, "Funding Pool only function");
+        _;
+    }
+
+    modifier onlyOwner {
+        require(msg.sender == owner, "Owner only function");
+        _;
+    }
+
+    // ===========================================================================================================
+    // Constructor
+    constructor(string memory uri_) ERC1155(uri_) {
+        owner = msg.sender;
+    }
+
+    function createGrant(string calldata _grantName, uint256 _grantEndTime) external returns(uint256 _grantId) {
         grantInfo[latestUnusedId].grantName = _grantName;
         grantInfo[latestUnusedId].grantEndTime = _grantEndTime;
         grantInfo[latestUnusedId].grantOwner = msg.sender;
         grantsByAddress[msg.sender].push(latestUnusedId);
 
         emit GrantCreated(_grantName, latestUnusedId, _grantEndTime, msg.sender, grantsByAddress[msg.sender]);
-        latestUnusedId++;
+
+        return latestUnusedId++;
     }
 
-	// will change to only Pool.sol can mint
-    function mint(
+	// internal and only FundingPool can mint
+    function _mintBatch(
         address to,
-        uint256 id,
-        uint256 amount,
+        uint256[] memory ids,
+        uint256[] memory amounts,
         bytes memory data
-    ) external {
-		require(block.timestamp < grantInfo[id].grantEndTime, "Round ended");
-		_mint(to, id, amount, data);
+    ) internal override onlyPool {
+        for (uint256 i; i < ids.length;) {
+		    require(block.timestamp < grantInfo[ids[i]].grantEndTime, "Round ended");
+		    super._mintBatch(to, ids, amounts, data);
+            unchecked {
+                i++;
+            }
+        }
+    }
+
+    // ===========================================================================================================
+    // Owner functions
+    function setPool(address _poolAddress) external onlyOwner {
+        poolAddress = _poolAddress;
+    }
+
+    function setURI(string calldata _newuri) external onlyOwner {
+        _setURI(_newuri);
     }
 }
