@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
 import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
@@ -9,7 +9,7 @@ import "./Hypercert.sol";
 
 /// @title FundingPool
 /// @dev This is the contract that will handle operations related to Donation Pool and QF Pool
-abstract contract FundingPool is Hypercert {
+contract FundingPool is Ownable {
     Hypercert public hypercert;
 
     ///@dev Struct to store tokenID and respective value deposited
@@ -50,6 +50,24 @@ abstract contract FundingPool is Hypercert {
         uint256 _value
     );
 
+    ///@dev Modifier to check that the person calling the function is the grant creator
+    modifier onlyGrantCreator(address _grantCreator) {
+        require(
+            hypercert._grantCreatorExists(_grantCreator),
+            "Only grant creator can call this function"
+        );
+        _;
+    }
+
+    ///@dev Modifier to check that the grant period of tokenID has ended
+    modifier grantPeriodHasEnded(uint256 _tokenID) {
+        require(
+            hypercert._grantPeriodHasEnded(_tokenID),
+            "Grant period has not ended"
+        );
+        _;
+    }
+
     constructor(address _hypercert, address _defaultToken) {
         hypercert = Hypercert(_hypercert);
         allowedTokens[_defaultToken] = true;
@@ -61,8 +79,6 @@ abstract contract FundingPool is Hypercert {
     function allowAddress(address _token) public onlyOwner {
         allowedTokens[_token] = true;
     }
-
-    //TODO: implement function to release funds to grant creator after period ends, transfer some funds as protocol fees, call the other contract
 
     ///@notice Function to deposit funds into the donation pool
     ///@dev One address can deposit in batch for multiple tokenIDs
@@ -124,7 +140,39 @@ abstract contract FundingPool is Hypercert {
         }
 
         //call the function to mint the tokens
-        super._mintBatch(msg.sender, tokenIDs, tokenValues, data);
+        hypercert._mintBatchExternal(msg.sender, tokenIDs, tokenValues, data);
+    }
+
+    ///@notice Function to withdraw funds from the donation pool
+    ///@notice Certain portion of funds will be transferred to the QF pool
+    ///@dev Check that only the grant creator can call this function
+    ///@dev Check that the grant period has ended before calling this function
+    ///@dev Update the value of funds in the donation pool
+    ///@dev The value to withdraw is read from donationPoolFundsByTokenID
+    ///@param _tokenID - the tokenID of the token to withdraw
+    ///@param _token - the address of the token to withdraw
+    function withdrawFunds(uint256 _tokenID, address _token) external onlyGrantCreator(msg.sender) grantPeriodHasEnded(_tokenID){
+        //the transfer happens once for all the tokenIDs
+        require(
+            allowedTokens[_token] == true,
+            "Token is not allowed/supported"
+        );
+        require(
+            IERC20(_token).allowance(address(this), msg.sender) >= 0,
+            "Not approved to send balance requested"
+        );
+        bool success = IERC20(_token).transferFrom(
+            address(this),
+            msg.sender,
+            donationPoolFundsByTokenID[_tokenID]
+        );
+        require(success, "Transaction was not successful");
+        
+        //update the value of funds in the donation pool
+        donationPoolFunds -= donationPoolFundsByTokenID[_tokenID];
+
+        //transfer the funds to the QF pool
+        // hypercert.transferFundsToQFPool(_tokenID);
     }
 
     ///@dev Function to convert the decimal value of the token to round
