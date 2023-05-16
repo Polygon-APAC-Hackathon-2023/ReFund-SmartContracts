@@ -68,7 +68,7 @@ contract FundingPool is Ownable {
 
         //only after the transfer is successful, the data can be accordingly updated
         for (uint256 i; i < _grantIds.length; ) {
-            if (_grantIds[i] < hypercert.latestUnusedId()) {
+            if (_grantIds[i] > hypercert.latestUnusedId()) {
                 revert GrantNotExist();
             }
             donationPoolFundsByTokenID[_grantIds[i]] += _depositFunds[i];

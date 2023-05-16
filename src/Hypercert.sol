@@ -83,7 +83,7 @@ contract Hypercert is ERC1155Supply, Ownable {
     }
 
     function grantEnded(uint256 _grandId) external view returns (bool _ended) {
-        return grantInfo[_grandId].grantEndTime > block.timestamp;
+        return grantInfo[_grandId].grantEndTime < block.timestamp;
     }
 
     // ===========================================================================================================
