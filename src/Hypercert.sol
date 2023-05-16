@@ -64,12 +64,12 @@ contract Hypercert is ERC1155Supply {
     }
 
     // internal and only FundingPool can mint
-    function _mintBatch(
+    function _mintBatchExternal(
         address to,
         uint256[] memory ids,
         uint256[] memory amounts,
         bytes memory data
-    ) internal override onlyPool {
+    ) external onlyPool {
         for (uint256 i; i < ids.length; ) {
             require(
                 block.timestamp < grantInfo[ids[i]].grantEndTime,
@@ -81,6 +81,33 @@ contract Hypercert is ERC1155Supply {
             }
         }
     }
+
+    ///@dev Function that checks if a given grant creator exists in the mapping
+    function _grantCreatorExists(
+        address _grantCreator
+    ) public view returns (bool) {
+        if (grantsByAddress[_grantCreator].length != 0) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    ///@dev Function to check that the grant period of tokenID has ended
+    function _grantPeriodHasEnded(uint256 _tokenID) public view returns (bool) {
+        if (grantInfo[_tokenID].grantEndTime < block.timestamp) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    function _mintBatch(
+        address to,
+        uint256[] memory ids,
+        uint256[] memory amounts,
+        bytes memory data
+    ) internal override {}
 
     // ===========================================================================================================
     // Owner functions
