@@ -2,10 +2,10 @@
 pragma solidity ^0.8.13;
 
 import "openzeppelin-contracts/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
+import "openzeppelin-contracts/contracts/access/Ownable.sol";
 
-contract Hypercert is ERC1155Supply {
+contract Hypercert is ERC1155Supply, Ownable {
     uint256 public latestUnusedId;
-    address public owner;
     address public poolAddress;
 
     struct GrantInfo {
@@ -25,6 +25,8 @@ contract Hypercert is ERC1155Supply {
         uint256[] _grantsByAddress
     );
 
+    error RoundEnded(uint256 _grantId);
+
     // ===========================================================================================================
     // Modifiers
     modifier onlyPool() {
@@ -32,16 +34,9 @@ contract Hypercert is ERC1155Supply {
         _;
     }
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Owner only function");
-        _;
-    }
-
     // ===========================================================================================================
     // Constructor
-    constructor(string memory uri_) ERC1155(uri_) {
-        owner = msg.sender;
-    }
+    constructor(string memory uri_) ERC1155(uri_) {}
 
     function createGrant(
         string calldata _grantName,
@@ -63,7 +58,7 @@ contract Hypercert is ERC1155Supply {
         return latestUnusedId++;
     }
 
-    // internal and only FundingPool can mint
+    // @Notice only Pool can mint.
     function mintBatch(
         address to,
         uint256[] memory ids,
@@ -71,43 +66,25 @@ contract Hypercert is ERC1155Supply {
         bytes memory data
     ) external onlyPool {
         for (uint256 i; i < ids.length; ) {
-            require(
-                block.timestamp < grantInfo[ids[i]].grantEndTime,
-                "Round ended"
-            );
+            if (block.timestamp > grantInfo[ids[i]].grantEndTime) {
+                revert RoundEnded(ids[i]);
+            }
             unchecked {
                 i++;
             }
-        super._mintBatch(to, ids, amounts, data);
+        _mintBatch(to, ids, amounts, data);
         }
     }
 
-    ///@dev Function that checks if a given grant creator exists in the mapping
-    function _grantCreatorExists(
-        address _grantCreator
-    ) public view returns (bool) {
-        if (grantsByAddress[_grantCreator].length != 0) {
-            return true;
-        } else {
-            return false;
-        }
+    // ===========================================================================================================
+    // View functions
+    function grantOwner(uint256 _grandId) external view returns (address _creator) {
+        return grantInfo[_grandId].grantOwner;
     }
 
-    ///@dev Function to check that the grant period of tokenID has ended
-    function _grantPeriodHasEnded(uint256 _tokenID) public view returns (bool) {
-        if (grantInfo[_tokenID].grantEndTime < block.timestamp) {
-            return true;
-        } else {
-            return false;
-        }
+    function grantEnded(uint256 _grandId) external view returns (bool _ended) {
+        return grantInfo[_grandId].grantEndTime > block.timestamp;
     }
-
-    function _mintBatch(
-        address to,
-        uint256[] memory ids,
-        uint256[] memory amounts,
-        bytes memory data
-    ) internal override {}
 
     // ===========================================================================================================
     // Owner functions

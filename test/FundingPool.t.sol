@@ -13,8 +13,8 @@ contract FundingPoolTest is Test {
 
     function setUp() public {
         //set up hypercert contract
-        hypercert = new Hypercert("https://rei
-        hyperc fundingPool = new FundingPool(_usdcAddress, _usdcAddress);
+        hypercert = new Hypercert("https://rei");
+        fundingPool = new FundingPool(_usdcAddress, _usdcAddress);
     }
 
     function testDepositFunds() public {
