@@ -1,16 +1,20 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
-import "../src/DonationPool.sol";
+import "../src/FundingPool.sol";
+import "../src/Hypercert.sol";
 
-contract DonationPoolTest is Test {
-    DonationPool public donationPool;
+contract FundingPoolTest is Test {
+    FundingPool public fundingPool;
+    Hypercert public hypercert;
 
     address _usdcAddress = 0x0FA8781a83E46826621b3BC094Ea2A0212e71B23;
 
     function setUp() public {
-        donationPool = new DonationPool(_usdcAddress);
+        //set up hypercert contract
+        hypercert = new Hypercert("https://rei
+        hyperc fundingPool = new FundingPool(_usdcAddress, _usdcAddress);
     }
 
     function testDepositFunds() public {
@@ -18,7 +22,7 @@ contract DonationPoolTest is Test {
         uint256 amount = 100;
 
         //print the amount before
-        donationPool.totalFunds();
+        // fundingPool.totalFunds();
 
         // Call the depositFunds function
         // donationPool.depositFunds(amount);
