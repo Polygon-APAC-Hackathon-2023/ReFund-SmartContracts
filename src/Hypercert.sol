@@ -64,7 +64,7 @@ contract Hypercert is ERC1155Supply {
     }
 
     // internal and only FundingPool can mint
-    function _mintBatchExternal(
+    function mintBatch(
         address to,
         uint256[] memory ids,
         uint256[] memory amounts,
@@ -75,10 +75,10 @@ contract Hypercert is ERC1155Supply {
                 block.timestamp < grantInfo[ids[i]].grantEndTime,
                 "Round ended"
             );
-            super._mintBatch(to, ids, amounts, data);
             unchecked {
                 i++;
             }
+        super._mintBatch(to, ids, amounts, data);
         }
     }
 
