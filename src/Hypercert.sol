@@ -99,10 +99,6 @@ contract Hypercert is ERC1155Supply, ERC1155URIStorage, Ownable {
         poolAddress = _poolAddress;
     }
 
-    function setURI(string calldata _newuri) external onlyOwner {
-        _setURI(_newuri);
-    }
-
     // ===========================================================================================================
     // Override functions
     function uri(uint256 tokenId) public view override(ERC1155, ERC1155URIStorage) returns (string memory) {
