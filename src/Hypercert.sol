@@ -72,8 +72,8 @@ contract Hypercert is ERC1155Supply, Ownable {
             unchecked {
                 i++;
             }
-        _mintBatch(to, ids, amounts, data);
         }
+        _mintBatch(to, ids, amounts, data);
     }
 
     // ===========================================================================================================

@@ -11,46 +11,46 @@ import "./Hypercert.sol";
 /// @dev This is the contract that will handle operations related to Donation Pool and QF Pool
 contract FundingPool is Ownable {
     Hypercert public hypercert;
+    address public treasuryAddress;
+    address public qFAddress;
     uint256 public donationPoolFunds;
+    uint256 public treasuryFunds;
+    uint256 public quadraticFundingPoolFunds;
+    uint256 public treasuryShare = 2; // 2%
+    uint256 public quadraticFundingPoolShare = 3; // 3%
+    uint256 private constant precision = 10 ** 2; // precision made for percentage
 
     mapping(address => bool) public allowedTokens;
-    mapping(uint256 => uint256) public donationPoolFundsByTokenID;
+    mapping(uint256 => uint256) public donationPoolFundsByGrantId;
     mapping(address => mapping(uint256 => uint256)) public fundsDepositedByAddress;
 
-    /// @notice Event to track that funds have been deposited
-    /// @param _from - the address of the donor
-    /// @param _tokenID - the tokenID of the token deposited
-    /// @param _value - the amount of funds deposited
     event FundsDeposited(
         address indexed _from,
-        uint256[] _tokenID,
-        uint256[] _value
+        uint256[] _grantId,
+        uint256[] _value,
+        uint256 _cumulativeTotal
     );
-    event FundsWithdrawed(uint256 indexed _tokenId, uint256 _amount, address indexed _creator);
+    event FundsWithdrawed(uint256 indexed _grantId, uint256 _amount, address indexed _creator);
+    event FundsTransferredToTreasuryAndQFPools(uint256 _treasuryAmount, uint256 _qFPoolAmount);
+    event Withdrawed(uint256 _amount, address indexed _address);
 
     error GrantNotExist();
+    error TotalIsNotEqual(uint256 _totalCheck, uint256 _cumulativeTotal);
 
     constructor(address _hypercert, address _defaultToken) {
         hypercert = Hypercert(_hypercert);
         allowedTokens[_defaultToken] = true;
     }
 
-    ///@notice Function to allow only a specific token to be deposited
-    ///@dev Only the owner of the contract can call this function
-    ///@param _token - the address of the token to be allowed
-    function allowToken(address _token) public onlyOwner {
-        allowedTokens[_token] = true;
-    }
-
     ///@notice Function to deposit funds into the donation pool
-    ///@dev One address can deposit in batch for multiple tokenIDs
+    ///        One address can deposit in batch for multiple grantIds
     function depositFunds(
         uint256[] calldata _grantIds,
         uint256[] calldata  _depositFunds,
         uint256 _cumulativeTotal,
         address _token
     ) external payable {
-        //the transfer happens once for all the tokenIDs
+        require(_grantIds.length == _depositFunds.length, "Both arrays length not equal");
         require(allowedTokens[_token] == true, "Token is not allowed/supported");
         require(
             IERC20Decimal(_token).allowance(msg.sender, address(this)) >= _cumulativeTotal,
@@ -64,55 +64,125 @@ contract FundingPool is Ownable {
         require(success, "Transaction was not successful");
 
         donationPoolFunds += _cumulativeTotal;
-        uint256[] memory roundedFunds;
 
-        //only after the transfer is successful, the data can be accordingly updated
+        uint256[] memory roundedFunds = new uint256[](_grantIds.length);
+        uint256 latestUnusedId = hypercert.latestUnusedId();
+        uint256 decimals = IERC20Decimal(_token).decimals();
+        uint256 totalCheck;
         for (uint256 i; i < _grantIds.length; ) {
-            if (_grantIds[i] > hypercert.latestUnusedId()) {
-                revert GrantNotExist();
+            if (_grantIds[i] > latestUnusedId) {
+                revert GrantNotExist();   // check if grantId exist.
             }
-            donationPoolFundsByTokenID[_grantIds[i]] += _depositFunds[i];
+            donationPoolFundsByGrantId[_grantIds[i]] += _depositFunds[i];
             fundsDepositedByAddress[msg.sender][_grantIds[i]] += _depositFunds[i];
-            roundedFunds[i] = _depositFunds[i] / (10 ** IERC20Decimal(_token).decimals());
+            totalCheck += _depositFunds[i];
+            roundedFunds[i] = _depositFunds[i] / (10 ** decimals);
             unchecked {
                 i++;
             }
         }
-        //emit event to track that funds have been deposited
+
+        if (totalCheck != _cumulativeTotal) {
+            revert TotalIsNotEqual(totalCheck, _cumulativeTotal);
+        }
+
         emit FundsDeposited(
             msg.sender,
             _grantIds,
-            _depositFunds
+            _depositFunds,
+            _cumulativeTotal
         );
-        //call the function to mint the tokens
+        
         hypercert.mintBatch(msg.sender, _grantIds, roundedFunds, "");
     }
 
     ///@notice Function to withdraw funds from the donation pool
-    ///@notice Certain portion of funds will be transferred to the QF pool
-    ///@dev Check that only the grant creator can call this function
-    ///@dev Check that the grant period has ended before calling this function
-    ///@dev Update the value of funds in the donation pool
-    ///@dev The value to withdraw is read from donationPoolFundsByTokenID
-    ///@param _tokenID - the tokenID of the token to withdraw
-    ///@param _token - the address of the token to withdraw
-    function withdrawFunds(uint256 _tokenID, address _token) external {
-        if (_tokenID < hypercert.latestUnusedId()) {
+    ///        Certain portion of funds will be transferred to the Treasury and QF pool
+    function withdrawFunds(uint256 _grantId, address _token) external {
+        if (_grantId > hypercert.latestUnusedId()) {
             revert GrantNotExist();
         }
-        require(hypercert.grantEnded(_tokenID), "Not ended");
-        require(hypercert.grantOwner(_tokenID) == msg.sender, "Not creator");
-        require(allowedTokens[_token] == true, "Token is not allowed/supported");
-        bool success = IERC20Decimal(_token).transferFrom(
-            address(this),
+        require(hypercert.grantEnded(_grantId), "Round not ended");
+        require(hypercert.grantOwner(_grantId) == msg.sender, "Caller not creator");
+        require(allowedTokens[_token] == true, "Token is not supported");
+
+        uint256 amountToQFPool = donationPoolFundsByGrantId[_grantId] * precision
+                                    * quadraticFundingPoolShare / 100 / precision;
+        uint256 amountToTreasury = donationPoolFundsByGrantId[_grantId] * precision
+                                    * treasuryShare / 100 / precision;
+        quadraticFundingPoolFunds += amountToQFPool;
+        treasuryFunds += amountToTreasury;
+
+        uint256 amountToSend = donationPoolFundsByGrantId[_grantId] - amountToQFPool - amountToTreasury;
+
+        bool success = IERC20Decimal(_token).transfer(
             msg.sender,
-            donationPoolFundsByTokenID[_tokenID]
+            amountToSend
         );
         require(success, "Transaction was not successful");
 
-        emit FundsWithdrawed(_tokenID, donationPoolFundsByTokenID[_tokenID], msg.sender);
+        emit FundsTransferredToTreasuryAndQFPools(amountToTreasury, amountToQFPool);
+        emit FundsWithdrawed(_grantId, amountToSend, msg.sender);
 
         //update the value of funds in the donation pool
-        donationPoolFunds -= donationPoolFundsByTokenID[_tokenID];
+        donationPoolFunds -= donationPoolFundsByGrantId[_grantId];
+    }
+
+    // =====================================================================================================
+    // QF Pool and Treasury withdrawal functions;
+    function qFWithdraw(address _token) external {
+        require(qFAddress != address(0), "Address not set");
+        require(quadraticFundingPoolFunds != 0, "No amount to withdraw");
+        require(allowedTokens[_token] == true, "Token is not supported");
+        uint256 amount = quadraticFundingPoolFunds;
+        quadraticFundingPoolFunds -= amount;
+
+        bool success = IERC20Decimal(_token).transfer(
+            qFAddress,
+            amount
+        );
+        require(success, "Transaction was not successful");
+
+        emit Withdrawed(amount, qFAddress);
+    }
+
+    function treasuryWithdraw(address _token) external {
+        require(treasuryAddress != address(0), "Address not set");
+        require(treasuryFunds != 0, "No amount to withdraw");
+        require(allowedTokens[_token] == true, "Token is not supported");
+        uint256 amount = treasuryFunds;
+        treasuryFunds -= amount;
+
+        bool success = IERC20Decimal(_token).transfer(
+            treasuryAddress,
+            amount
+        );
+        require(success, "Transaction was not successful");
+
+        emit Withdrawed(amount, treasuryAddress);
+    }
+
+    // =====================================================================================================
+    // Owner functions
+    function allowToken(address _token) external onlyOwner {
+        allowedTokens[_token] = true;
+    }
+
+    function setQFAddress(address _qFAddress) external onlyOwner {
+        qFAddress = _qFAddress;
+    }
+
+    function setTreasuryAddress(address _treasuryAddress) external onlyOwner {
+        treasuryAddress = _treasuryAddress;
+    }
+
+    function setQFPoolShare(uint256 _percent) external onlyOwner {
+        require(_percent + treasuryShare < 101, "Unavailable percentage");
+        quadraticFundingPoolShare = _percent;
+    }
+
+    function setTreasuryPoolShare(uint256 _percent) external onlyOwner {
+        require(_percent + quadraticFundingPoolShare < 101, "Unavailable percentage");
+        quadraticFundingPoolShare = _percent;
     }
 }
