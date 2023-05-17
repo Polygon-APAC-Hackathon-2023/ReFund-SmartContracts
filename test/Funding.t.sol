@@ -23,8 +23,8 @@ contract Funding is Test {
 		fundingPool = new FundingPool(address(hypercert), address(mockUSDC));
 		hypercert.setPool(address(fundingPool));
 
-		hypercert.createGrant("first", block.timestamp + 1 days);
-		hypercert.createGrant("second", block.timestamp + 1 hours);
+		hypercert.createGrant("first", block.timestamp + 1 days, "firstURI");
+		hypercert.createGrant("second", block.timestamp + 1 hours, "secondURI");
 	}
 
 	function testDeposit() public {
