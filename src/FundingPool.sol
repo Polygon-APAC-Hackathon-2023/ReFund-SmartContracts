@@ -49,7 +49,7 @@ contract FundingPool is Ownable {
         uint256[] calldata  _depositFunds,
         uint256 _cumulativeTotal,
         address _token
-    ) external payable {
+    ) external {
         require(_grantIds.length == _depositFunds.length, "Both arrays length not equal");
         require(allowedTokens[_token] == true, "Token is not allowed/supported");
         require(
