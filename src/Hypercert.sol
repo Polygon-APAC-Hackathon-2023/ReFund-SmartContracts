@@ -14,6 +14,7 @@ contract Hypercert is ERC1155Supply, ERC1155URIStorage, Ownable {
         string grantName;
         uint256 grantEndTime;
         address grantOwner;
+        string grantURI;
     }
 
     mapping(uint256 => GrantInfo) public grantInfo;
@@ -50,6 +51,7 @@ contract Hypercert is ERC1155Supply, ERC1155URIStorage, Ownable {
         grantInfo[latestUnusedId].grantName = _grantName;
         grantInfo[latestUnusedId].grantEndTime = _grantEndTime;
         grantInfo[latestUnusedId].grantOwner = msg.sender;
+        grantInfo[latestUnusedId].grantURI = _tokenURI;
         grantsByAddress[msg.sender].push(latestUnusedId);
 
         _setURI(latestUnusedId, _tokenURI);
