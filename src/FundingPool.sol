@@ -168,6 +168,10 @@ contract FundingPool is Ownable {
         allowedTokens[_token] = true;
     }
 
+    function setHypercertAddress(Hypercert _hypercertAddress) external onlyOwner {
+        hypercert = _hypercertAddress;
+    }
+
     function setQFAddress(address _qFAddress) external onlyOwner {
         qFAddress = _qFAddress;
     }

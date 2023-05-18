@@ -34,7 +34,7 @@ contract Hypercert is ERC1155Supply, ERC1155URIStorage, Ownable {
     // ===========================================================================================================
     // Modifiers
     modifier onlyPool() {
-        require(msg.sender == poolAddress, "Funding Pool only function");
+        _onlyPool();
         _;
     }
 
@@ -97,6 +97,12 @@ contract Hypercert is ERC1155Supply, ERC1155URIStorage, Ownable {
     // Owner functions
     function setPool(address _poolAddress) external onlyOwner {
         poolAddress = _poolAddress;
+    }
+
+    // ===========================================================================================================
+    // Internal functions
+    function _onlyPool() internal view virtual {
+        require(msg.sender == poolAddress, "Funding Pool only function");
     }
 
     // ===========================================================================================================

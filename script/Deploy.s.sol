@@ -12,8 +12,8 @@ contract HypercertScript is Script {
 	MockUSDC mockUSDC;
 
     function run() public {
-        vm.startBroadcast(vm.envUint("PRIV_KEY"));
-        address addr = vm.addr(vm.envUint("PRIV_KEY"));
+        vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
+        address addr = vm.addr(vm.envUint("PRIVATE_KEY"));
 		hypercert = new Hypercert("https://something.com");
 		mockUSDC = new MockUSDC("USDC", "USDC", addr, 100000000000);
 		fundingPool = new FundingPool(address(hypercert), address(mockUSDC));
