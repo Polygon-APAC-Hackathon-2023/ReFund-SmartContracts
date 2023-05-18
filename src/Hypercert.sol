@@ -93,6 +93,10 @@ contract Hypercert is ERC1155Supply, ERC1155URIStorage, Ownable {
         return grantInfo[_grandId].grantEndTime < block.timestamp;
     }
 
+    function grantsCreatedByAddress(address _addr) external view returns (uint256[] memory _grants) {
+        return grantsByAddress[_addr];
+    }
+
     // ===========================================================================================================
     // Owner functions
     function setPool(address _poolAddress) external onlyOwner {
