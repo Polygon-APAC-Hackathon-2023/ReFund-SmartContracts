@@ -11,7 +11,7 @@ contract MockUSDC is ERC20Mock {
         uint256 initialBalance
     ) payable ERC20Mock(name, symbol, initialAccount, initialBalance) {}
 
-    function decimals() public view virtual override returns (uint8) {
+    function decimals() public pure override returns (uint8) {
         return 6;
 	}
 }

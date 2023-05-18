@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
+import "./Hypercert.sol";
 import "./IERC20Decimal.sol";
 import "openzeppelin-contracts/contracts/access/Ownable.sol";
 
-//Import Hypercert contract
-import "./Hypercert.sol";
 
 /// @title FundingPool
 /// @dev This is the contract that will handle operations related to Donation Pool and QF Pool
@@ -14,15 +13,21 @@ contract FundingPool is Ownable {
     address public treasuryAddress;
     address public qFAddress;
     uint256 public donationPoolFunds;
-    uint256 public treasuryFunds;
-    uint256 public quadraticFundingPoolFunds;
     uint256 public treasuryShare = 2; // 2%
     uint256 public quadraticFundingPoolShare = 3; // 3%
     uint256 private constant precision = 10 ** 2; // precision made for percentage
 
+    struct FundInfo {
+        uint256 grantId;
+        uint256 depositFund;
+        string tokenSymbol;
+    }
+
     mapping(address => bool) public allowedTokens;
-    mapping(uint256 => uint256) public donationPoolFundsByGrantId;
-    mapping(address => mapping(uint256 => uint256)) public fundsDepositedByAddress;
+    mapping(uint256 => mapping(address => uint256)) public donationPoolFundsByGrantId;
+    mapping(address => FundInfo[]) public fundsDepositedByAddress;
+    mapping(address => uint256) public quadraticFundingPoolFunds;
+    mapping(address => uint256) public treasuryFunds;
 
     event FundsDeposited(
         address indexed _from,
@@ -68,13 +73,18 @@ contract FundingPool is Ownable {
         uint256[] memory roundedFunds = new uint256[](_grantIds.length);
         uint256 latestUnusedId = hypercert.latestUnusedId();
         uint256 decimals = IERC20Decimal(_token).decimals();
+        string memory _tokenSymbol = IERC20Decimal(_token).symbol();
         uint256 totalCheck;
         for (uint256 i; i < _grantIds.length; ) {
             if (_grantIds[i] >= latestUnusedId) {
                 revert GrantNotExist();   // check if grantId exist.
             }
-            donationPoolFundsByGrantId[_grantIds[i]] += _depositFunds[i];
-            fundsDepositedByAddress[msg.sender][_grantIds[i]] += _depositFunds[i];
+            donationPoolFundsByGrantId[_grantIds[i]][_token] += _depositFunds[i];
+            fundsDepositedByAddress[msg.sender].push(FundInfo(
+                _grantIds[i],
+                _depositFunds[i],
+                _tokenSymbol
+            ));
             totalCheck += _depositFunds[i];
             roundedFunds[i] = _depositFunds[i] / (10 ** decimals);
             unchecked {
@@ -106,14 +116,14 @@ contract FundingPool is Ownable {
         require(hypercert.grantOwner(_grantId) == msg.sender, "Caller not creator");
         require(allowedTokens[_token] == true, "Token is not supported");
 
-        uint256 amountToQFPool = donationPoolFundsByGrantId[_grantId] * precision
+        uint256 amountToQFPool = donationPoolFundsByGrantId[_grantId][_token] * precision
                                     * quadraticFundingPoolShare / 100 / precision;
-        uint256 amountToTreasury = donationPoolFundsByGrantId[_grantId] * precision
+        uint256 amountToTreasury = donationPoolFundsByGrantId[_grantId][_token] * precision
                                     * treasuryShare / 100 / precision;
-        quadraticFundingPoolFunds += amountToQFPool;
-        treasuryFunds += amountToTreasury;
+        quadraticFundingPoolFunds[_token] += amountToQFPool;
+        treasuryFunds[_token] += amountToTreasury;
 
-        uint256 amountToSend = donationPoolFundsByGrantId[_grantId] - amountToQFPool - amountToTreasury;
+        uint256 amountToSend = donationPoolFundsByGrantId[_grantId][_token] - amountToQFPool - amountToTreasury;
 
         bool success = IERC20Decimal(_token).transfer(
             msg.sender,
@@ -125,17 +135,23 @@ contract FundingPool is Ownable {
         emit FundsWithdrawed(_grantId, amountToSend, msg.sender);
 
         //update the value of funds in the donation pool
-        donationPoolFunds -= donationPoolFundsByGrantId[_grantId];
+        donationPoolFunds -= donationPoolFundsByGrantId[_grantId][_token];
     }
 
     // =====================================================================================================
-    // QF Pool and Treasury withdrawal functions;
+    // View functions
+    function fundInfoByAddress(address _addr) external view returns (FundInfo[] memory _fundInfo) {
+        return fundsDepositedByAddress[_addr];
+    }
+
+    // =====================================================================================================
+    // QF Pool and Treasury withdrawal functions
     function qFWithdraw(address _token) external {
         require(qFAddress != address(0), "Address not set");
-        require(quadraticFundingPoolFunds != 0, "No amount to withdraw");
+        require(quadraticFundingPoolFunds[_token] != 0, "No amount to withdraw");
         require(allowedTokens[_token] == true, "Token is not supported");
-        uint256 amount = quadraticFundingPoolFunds;
-        quadraticFundingPoolFunds -= amount;
+        uint256 amount = quadraticFundingPoolFunds[_token];
+        quadraticFundingPoolFunds[_token] -= amount;
 
         bool success = IERC20Decimal(_token).transfer(
             qFAddress,
@@ -148,10 +164,10 @@ contract FundingPool is Ownable {
 
     function treasuryWithdraw(address _token) external {
         require(treasuryAddress != address(0), "Address not set");
-        require(treasuryFunds != 0, "No amount to withdraw");
+        require(treasuryFunds[_token] != 0, "No amount to withdraw");
         require(allowedTokens[_token] == true, "Token is not supported");
-        uint256 amount = treasuryFunds;
-        treasuryFunds -= amount;
+        uint256 amount = treasuryFunds[_token];
+        treasuryFunds[_token] -= amount;
 
         bool success = IERC20Decimal(_token).transfer(
             treasuryAddress,
@@ -164,8 +180,8 @@ contract FundingPool is Ownable {
 
     // =====================================================================================================
     // Owner functions
-    function allowToken(address _token) external onlyOwner {
-        allowedTokens[_token] = true;
+    function allowToken(address _token, bool _bool) external onlyOwner {
+        allowedTokens[_token] = _bool;
     }
 
     function setHypercertAddress(Hypercert _hypercertAddress) external onlyOwner {
