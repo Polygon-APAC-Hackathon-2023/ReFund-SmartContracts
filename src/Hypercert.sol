@@ -40,7 +40,7 @@ contract Hypercert is ERC1155Supply, ERC1155URIStorage, Ownable {
 
     // ===========================================================================================================
     // Constructor
-    constructor(string memory uri_) ERC1155(uri_) {}
+    constructor() ERC1155("") {}
 
     function createGrant(
         string calldata _grantName,

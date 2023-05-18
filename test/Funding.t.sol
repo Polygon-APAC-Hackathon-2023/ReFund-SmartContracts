@@ -17,7 +17,7 @@ contract Funding is Test {
 	error RoundEnded(uint256 _tokenId);
 
 	function setUp() public {
-		hypercert = new Hypercert("https://something.com");
+		hypercert = new Hypercert();
 		vm.prank(alice);
 		mockUSDC = new MockUSDC("USDC", "USDC", alice, 100000000000);
 		fundingPool = new FundingPool(address(hypercert), address(mockUSDC));
@@ -130,5 +130,7 @@ contract Funding is Test {
 
 		fundingPool.setTreasuryAddress(bob);
 		fundingPool.treasuryWithdraw(address(mockUSDC));
+
+		hypercert.uri(2);
 	}
 }
