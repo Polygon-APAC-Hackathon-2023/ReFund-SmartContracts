@@ -70,7 +70,7 @@ contract FundingPool is Ownable {
         uint256 decimals = IERC20Decimal(_token).decimals();
         uint256 totalCheck;
         for (uint256 i; i < _grantIds.length; ) {
-            if (_grantIds[i] > latestUnusedId) {
+            if (_grantIds[i] >= latestUnusedId) {
                 revert GrantNotExist();   // check if grantId exist.
             }
             donationPoolFundsByGrantId[_grantIds[i]] += _depositFunds[i];
@@ -99,7 +99,7 @@ contract FundingPool is Ownable {
     ///@notice Function to withdraw funds from the donation pool
     ///        Certain portion of funds will be transferred to the Treasury and QF pool
     function withdrawFunds(uint256 _grantId, address _token) external {
-        if (_grantId > hypercert.latestUnusedId()) {
+        if (_grantId >= hypercert.latestUnusedId()) {
             revert GrantNotExist();
         }
         require(hypercert.grantEnded(_grantId), "Round not ended");
