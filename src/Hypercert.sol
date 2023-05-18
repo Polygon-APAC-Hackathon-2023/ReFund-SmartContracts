@@ -103,6 +103,10 @@ contract Hypercert is ERC1155Supply, ERC1155URIStorage, Ownable {
         poolAddress = _poolAddress;
     }
 
+    function setURI(uint256 _tokenId, string calldata _tokenURI) external onlyOwner {
+        _setURI(_tokenId, _tokenURI);
+    }
+
     // ===========================================================================================================
     // Internal functions
     function _onlyPool() internal view virtual {
