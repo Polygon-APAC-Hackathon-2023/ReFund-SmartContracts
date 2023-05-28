@@ -13,5 +13,5 @@ contract MockUSDC is ERC20Mock {
 
     function decimals() public pure override returns (uint8) {
         return 6;
-	}
+    }
 }
