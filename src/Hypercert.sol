@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
+import "./interfaces/IHypercert.sol";
 import "openzeppelin-contracts/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 import "openzeppelin-contracts/contracts/token/ERC1155/extensions/ERC1155URIStorage.sol";
 import "openzeppelin-contracts/contracts/access/Ownable.sol";
@@ -9,13 +10,6 @@ contract Hypercert is ERC1155Supply, ERC1155URIStorage, Ownable {
     uint256 public latestUnusedId;
     address public poolAddress;
     string private _baseURI = "";
-
-    struct GrantInfo {
-        string grantName;
-        uint256 grantEndTime;
-        address grantOwner;
-        string grantURI;
-    }
 
     mapping(uint256 => GrantInfo) public grantInfo;
     mapping(address => uint256[]) public grantsByAddress;
@@ -89,6 +83,10 @@ contract Hypercert is ERC1155Supply, ERC1155URIStorage, Ownable {
     // View functions
     function grantOwner(uint256 _grandId) external view returns (address _creator) {
         return grantInfo[_grandId].grantOwner;
+    }
+
+    function grantEndTime(uint256 _grandId) external view returns (uint256 _endTime) {
+        return grantInfo[_grandId].grantEndTime;
     }
 
     function grantEnded(uint256 _grandId) external view returns (bool _ended) {

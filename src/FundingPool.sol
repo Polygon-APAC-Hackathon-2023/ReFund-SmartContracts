@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import "./Hypercert.sol";
-import "./IERC20Decimal.sol";
+import "./interfaces/IHypercert.sol";
+import "./interfaces/IFundingPool.sol";
+import "./interfaces/IERC20Decimal.sol";
 import "openzeppelin-contracts/contracts/access/Ownable.sol";
 
 
 /// @title FundingPool
 /// @dev This is the contract that will handle operations related to Donation Pool and QF Pool
 contract FundingPool is Ownable {
-    Hypercert public hypercert;
+    IHypercert public hypercert;
     address public treasuryAddress;
     address public qFAddress;
     uint256 public donationPoolFunds;
@@ -17,17 +18,14 @@ contract FundingPool is Ownable {
     uint256 public quadraticFundingPoolShare = 3; // 3%
     uint256 private constant precision = 10 ** 2; // precision made for percentage
 
-    struct FundInfo {
-        uint256 grantId;
-        uint256 depositFund;
-        string tokenSymbol;
-    }
-
     mapping(address => bool) public allowedTokens;
     mapping(uint256 => mapping(address => uint256)) public donationPoolFundsByGrantId;
     mapping(address => FundInfo[]) public fundsDepositedByAddress;
     mapping(address => uint256) public quadraticFundingPoolFunds;
     mapping(address => uint256) public treasuryFunds;
+    mapping(uint256 => address[]) public donatedAddresses;
+    mapping(uint256 => uint256) public donatedAddressNumber;
+    mapping(address => bool) public addressCounted;
 
     event FundsDeposited(
         address indexed _from,
@@ -42,8 +40,18 @@ contract FundingPool is Ownable {
     error GrantNotExist();
     error TotalIsNotEqual(uint256 _totalCheck, uint256 _cumulativeTotal);
 
+    modifier onlyQF() {
+        require(msg.sender == qFAddress);
+        _;
+    }
+    
+    modifier onlyTreasury() {
+        require(msg.sender == treasuryAddress);
+        _;
+    }
+
     constructor(address _hypercert, address _defaultToken) {
-        hypercert = Hypercert(_hypercert);
+        hypercert = IHypercert(_hypercert);
         allowedTokens[_defaultToken] = true;
     }
 
@@ -68,33 +76,7 @@ contract FundingPool is Ownable {
         );
         require(success, "Transaction was not successful");
 
-        donationPoolFunds += _cumulativeTotal;
-
-        uint256[] memory roundedFunds = new uint256[](_grantIds.length);
-        uint256 latestUnusedId = hypercert.latestUnusedId();
-        uint256 decimals = IERC20Decimal(_token).decimals();
-        string memory _tokenSymbol = IERC20Decimal(_token).symbol();
-        uint256 totalCheck;
-        for (uint256 i; i < _grantIds.length; ) {
-            if (_grantIds[i] >= latestUnusedId) {
-                revert GrantNotExist();   // check if grantId exist.
-            }
-            donationPoolFundsByGrantId[_grantIds[i]][_token] += _depositFunds[i];
-            fundsDepositedByAddress[msg.sender].push(FundInfo(
-                _grantIds[i],
-                _depositFunds[i],
-                _tokenSymbol
-            ));
-            totalCheck += _depositFunds[i];
-            roundedFunds[i] = _depositFunds[i] / (10 ** decimals);
-            unchecked {
-                i++;
-            }
-        }
-
-        if (totalCheck != _cumulativeTotal) {
-            revert TotalIsNotEqual(totalCheck, _cumulativeTotal);
-        }
+        uint256[] memory roundedFunds = __depositFunds(_grantIds, _depositFunds, _cumulativeTotal, _token);
 
         emit FundsDeposited(
             msg.sender,
@@ -104,6 +86,46 @@ contract FundingPool is Ownable {
         );
         
         hypercert.mintBatch(msg.sender, _grantIds, roundedFunds, "");
+    }
+
+    function __depositFunds(
+        uint256[] calldata _grantIds,
+        uint256[] calldata  _depositFunds,
+        uint256 _cumulativeTotal,
+        address _token
+    ) internal returns (uint256[] memory roundedFunds) {
+        donationPoolFunds += _cumulativeTotal;
+
+        roundedFunds = new uint256[](_grantIds.length);
+        uint256 latestUnusedId = hypercert.latestUnusedId();
+        uint256 decimals = IERC20Decimal(_token).decimals();
+        string memory _tokenSymbol = IERC20Decimal(_token).symbol();
+        uint256 totalCheck;
+        for (uint256 i; i < _grantIds.length; ) {
+            if (_grantIds[i] >= latestUnusedId) revert GrantNotExist();   // check if grantId exist.
+            donationPoolFundsByGrantId[_grantIds[i]][_token] += _depositFunds[i];
+
+            fundsDepositedByAddress[msg.sender].push(FundInfo(
+                _grantIds[i],
+                _depositFunds[i],
+                _tokenSymbol
+            ));
+
+            unchecked {      // overflows and underflows not possible in below operations
+            if (addressCounted[msg.sender] == false) {
+                donatedAddresses[_grantIds[i]].push(msg.sender);
+                donatedAddressNumber[_grantIds[i]] += 1;
+                addressCounted[msg.sender] == true;
+            }
+            totalCheck += _depositFunds[i];
+            roundedFunds[i] = _depositFunds[i] / (10 ** decimals);
+                i++;
+            }
+        }
+
+        if (totalCheck != _cumulativeTotal) {
+            revert TotalIsNotEqual(totalCheck, _cumulativeTotal);
+        }
     }
 
     ///@notice Function to withdraw funds from the donation pool
@@ -120,10 +142,17 @@ contract FundingPool is Ownable {
                                     * quadraticFundingPoolShare / 100 / precision;
         uint256 amountToTreasury = donationPoolFundsByGrantId[_grantId][_token] * precision
                                     * treasuryShare / 100 / precision;
-        quadraticFundingPoolFunds[_token] += amountToQFPool;
-        treasuryFunds[_token] += amountToTreasury;
+        
+        // overflows and underflows not possible
+        uint256 amountToSend;
+        unchecked {
+            quadraticFundingPoolFunds[_token] += amountToQFPool;
+            treasuryFunds[_token] += amountToTreasury;
+            amountToSend = donationPoolFundsByGrantId[_grantId][_token] - amountToQFPool - amountToTreasury;
 
-        uint256 amountToSend = donationPoolFundsByGrantId[_grantId][_token] - amountToQFPool - amountToTreasury;
+            //update the value of funds in the donation pool
+            donationPoolFunds -= donationPoolFundsByGrantId[_grantId][_token];
+        }
 
         bool success = IERC20Decimal(_token).transfer(
             msg.sender,
@@ -133,9 +162,6 @@ contract FundingPool is Ownable {
 
         emit FundsTransferredToTreasuryAndQFPools(amountToTreasury, amountToQFPool);
         emit FundsWithdrawed(_grantId, amountToSend, msg.sender);
-
-        //update the value of funds in the donation pool
-        donationPoolFunds -= donationPoolFundsByGrantId[_grantId][_token];
     }
 
     // =====================================================================================================
@@ -146,11 +172,11 @@ contract FundingPool is Ownable {
 
     // =====================================================================================================
     // QF Pool and Treasury withdrawal functions
-    function qFWithdraw(address _token) external {
+    function qFWithdraw(address _token) external onlyQF returns (uint256 amount) {
         require(qFAddress != address(0), "Address not set");
         require(quadraticFundingPoolFunds[_token] != 0, "No amount to withdraw");
         require(allowedTokens[_token] == true, "Token is not supported");
-        uint256 amount = quadraticFundingPoolFunds[_token];
+        amount = quadraticFundingPoolFunds[_token];
         quadraticFundingPoolFunds[_token] -= amount;
 
         bool success = IERC20Decimal(_token).transfer(
@@ -162,11 +188,11 @@ contract FundingPool is Ownable {
         emit Withdrawed(amount, qFAddress);
     }
 
-    function treasuryWithdraw(address _token) external {
+    function treasuryWithdraw(address _token) external onlyTreasury returns (uint256 amount) {
         require(treasuryAddress != address(0), "Address not set");
         require(treasuryFunds[_token] != 0, "No amount to withdraw");
         require(allowedTokens[_token] == true, "Token is not supported");
-        uint256 amount = treasuryFunds[_token];
+        amount = treasuryFunds[_token];
         treasuryFunds[_token] -= amount;
 
         bool success = IERC20Decimal(_token).transfer(
@@ -184,7 +210,7 @@ contract FundingPool is Ownable {
         allowedTokens[_token] = _bool;
     }
 
-    function setHypercertAddress(Hypercert _hypercertAddress) external onlyOwner {
+    function setHypercertAddress(IHypercert _hypercertAddress) external onlyOwner {
         hypercert = _hypercertAddress;
     }
 
