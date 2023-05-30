@@ -33,7 +33,6 @@ contract AuthenticateVerifier is ZKPVerifier {
     ) internal override {
         require(requestId == TRANSFER_REQUEST_ID);
         uint256 id = inputs[validator.getChallengeInputIndex()];
-        // Add the bidder to the list of bidders
         if (idToAddress[id] == address(0)) {
             addressToId[_msgSender()] = id;
             idToAddress[id] = _msgSender();
