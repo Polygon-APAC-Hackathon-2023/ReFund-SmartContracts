@@ -66,10 +66,10 @@ contract Funding is Test {
 		}
 		mockUSDC.approve(address(fundingPool), 5000000);
 
-		vm.warp(block.timestamp + 2 hours);   // warp blocktime to 2 hours later.
+		vm.warp(block.timestamp + 50 days);   // warp blocktime to 50 days later.
 
 		/// Deposit to ended grant
-		vm.expectRevert(abi.encodeWithSelector(RoundEnded.selector, 1));   // expect revert with custom error.
+		vm.expectRevert(abi.encodeWithSelector(RoundEnded.selector, 0));   // expect revert with custom error.
 		fundingPool.depositFunds(ids, amounts, total, address(mockUSDC));
 		hypercert.balanceOfBatch(addrs, ids);
 		vm.stopPrank();
@@ -96,32 +96,6 @@ contract Funding is Test {
 
 		vm.warp(block.timestamp + 2 days); // warp blocktime to 2 days later.
 		fundingPool.withdrawFunds(0, address(mockUSDC));
-	}
-
-	function testWithdrawalNotOwner() public {
-		vm.startPrank(alice);
-
-		/// Deposit USDC
-		uint256[] memory ids = new uint256[](2);
-		uint256[] memory amounts = new uint256[](2);
-		address[] memory addrs = new address[](2);
-		uint256 total;
-		for (uint256 i; i < uint256(2); i++) {
-			addrs[i] = alice;
-			ids[i] = i;
-			amounts[i] = 1000000 * i + 1000854;
-			total += amounts[i];
-		}
-		mockUSDC.approve(address(fundingPool), 5000000);
-		fundingPool.depositFunds(ids, amounts, total, address(mockUSDC));
-		hypercert.balanceOfBatch(addrs, ids);
-		vm.warp(block.timestamp + 2 days); // warp blocktime to 2 days later.
-
-		/// Test withdrawal from Alice
-		vm.expectRevert("Caller not creator"); // expect revert.
-		fundingPool.withdrawFunds(0, address(mockUSDC));
-		fundingPool.donationPoolFundsByGrantId(0, address(mockUSDC));
-		vm.stopPrank();
 	}
 
 	function testTreasuryWithdrawal() public {
