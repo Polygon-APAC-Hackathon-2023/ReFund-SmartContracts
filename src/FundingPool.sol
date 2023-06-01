@@ -33,7 +33,7 @@ contract FundingPool is Ownable {
         uint256[] _value,
         uint256 _cumulativeTotal
     );
-    event FundsWithdrawed(uint256 indexed _grantId, uint256 _amount, address indexed _creator);
+    event FundsWithdrawed(uint256 indexed _grantId, uint256 _amount, address indexed _grantCreator);
     event FundsTransferredToTreasuryAndQFPools(uint256 _treasuryAmount, uint256 _qFPoolAmount);
     event Withdrawed(uint256 _amount, address indexed _address);
 
@@ -41,12 +41,12 @@ contract FundingPool is Ownable {
     error TotalIsNotEqual(uint256 _totalCheck, uint256 _cumulativeTotal);
 
     modifier onlyQF() {
-        require(msg.sender == qFAddress);
+        require(msg.sender == qFAddress, "Not QF address");
         _;
     }
     
     modifier onlyTreasury() {
-        require(msg.sender == treasuryAddress);
+        require(msg.sender == treasuryAddress, "Not Treasury address");
         _;
     }
 
@@ -128,15 +128,17 @@ contract FundingPool is Ownable {
         }
     }
 
-    ///@notice Function to withdraw funds from the donation pool
-    ///        Certain portion of funds will be transferred to the Treasury and QF pool
+    /** @notice Function to withdraw funds from the donation pool
+     *  Certain portion of funds will be transferred to the Treasury and QF pool
+     *  Anyone can call this but funds will only transfer to grant owner.
+     */
     function withdrawFunds(uint256 _grantId, address _token) external {
         if (_grantId >= hypercert.latestUnusedId()) {
             revert GrantNotExist();
         }
         require(hypercert.grantEnded(_grantId), "Round not ended");
-        require(hypercert.grantOwner(_grantId) == msg.sender, "Caller not creator");
         require(allowedTokens[_token] == true, "Token is not supported");
+        require(donationPoolFundsByGrantId[_grantId][_token] > 0, "No amount to withdraw");
 
         uint256 amountToQFPool = donationPoolFundsByGrantId[_grantId][_token] * precision
                                     * quadraticFundingPoolShare / 100 / precision;
@@ -152,16 +154,18 @@ contract FundingPool is Ownable {
 
             //update the value of funds in the donation pool
             donationPoolFunds -= donationPoolFundsByGrantId[_grantId][_token];
+            donationPoolFundsByGrantId[_grantId][_token] = 0;
         }
 
+        address grantCreator = hypercert.grantOwner(_grantId);
         bool success = IERC20Decimal(_token).transfer(
-            msg.sender,
+            grantCreator,
             amountToSend
         );
         require(success, "Transaction was not successful");
 
         emit FundsTransferredToTreasuryAndQFPools(amountToTreasury, amountToQFPool);
-        emit FundsWithdrawed(_grantId, amountToSend, msg.sender);
+        emit FundsWithdrawed(_grantId, amountToSend, grantCreator);
     }
 
     // =====================================================================================================

@@ -17,16 +17,22 @@ contract QFPool is Ownable {
 	mapping(uint256 => mapping(address => uint256)) public allotmentsByIdToken;
 
 	event NewBalance(uint256 _thisBalances, address _token);
-	event FundsWithdrawed(uint256 _grantId, uint256 _amount, address _token, address _msgSender);
+	event FundsWithdrawed(uint256 _grantId, uint256 _amount, address _token, address _grantCreator);
+	event NewTimeFrame(uint256 _timeFrame);
 
 	error TransferFailed();
 	error GrantNotExist();
 
-	constructor(IFundingPool _fundingPool, IHypercert _hypercert) {
-		fundingPool = _fundingPool;
-		hypercert = _hypercert;
+	constructor(address _fundingPool, address _hypercert) {
+		fundingPool = IFundingPool(_fundingPool);
+		hypercert = IHypercert(_hypercert);
 	}
 
+	/**
+	 * @notice Distribute funds to eligible grants according to number of contributors over
+	 * total contributors within the eligible period.
+	 * Eligible means grants ended within timeFrame.
+	 */
 	function distributeFunds(address _token) external {
 		withdrawFromFundingPool(_token);
 		uint256 latestUnusedId = hypercert.latestUnusedId();
@@ -69,21 +75,22 @@ contract QFPool is Ownable {
 		}
 	}
 
+	/// @notice Withdraw allocated funds for grant creator.
     function withdrawFunds(uint256 _grantId, address _token) external {
         if (_grantId >= hypercert.latestUnusedId()) revert GrantNotExist();
-        require(hypercert.grantOwner(_grantId) == msg.sender, "Caller not creator");
         require(fundingPool.allowedTokens(_token) == true, "Token is not supported");
 		require(allotmentsByIdToken[_grantId][_token] > 0, "No Balance to withdraw");
 
+		address grantCreator = hypercert.grantOwner(_grantId);
         uint256 amount = allotmentsByIdToken[_grantId][_token];
 		allotmentsByIdToken[_grantId][_token] = 0;
-        if (!IERC20Decimal(_token).transfer(msg.sender, amount)) revert TransferFailed();
+        if (!IERC20Decimal(_token).transfer(grantCreator, amount)) revert TransferFailed();
 
-        emit FundsWithdrawed(_grantId, amount, _token, msg.sender);
+        emit FundsWithdrawed(_grantId, amount, _token, grantCreator);
     }
 
-    // =====================================================================================================
-    // Owner functions
+    /// =====================================================================================================
+    /// @dev Owner functions
     function setHypercertAddress(IHypercert _hypercert) external onlyOwner {
         hypercert = _hypercert;
     }
@@ -91,4 +98,9 @@ contract QFPool is Ownable {
     function setFundingPoolAddress(IFundingPool _fundingPool) external onlyOwner {
         fundingPool = _fundingPool;
     }
+
+	function setTimeFrame(uint256 _timeFrame) external onlyOwner {
+		timeFrame = _timeFrame;
+		emit NewTimeFrame(timeFrame);
+	}
 }
