@@ -33,7 +33,8 @@ contract QFPool is Ownable {
 	 * total contributors within the eligible period.
 	 * Eligible means grants ended within timeFrame.
 	 */
-	function distributeFunds(address _token) external {
+	function distributeFunds(address _token) public {
+		require(fundingPool.allowedTokens(_token) == true, "Token is not supported");
 		withdrawFromFundingPool(_token);
 		uint256 latestUnusedId = hypercert.latestUnusedId();
 		uint256 totalParticipants = _getTotalParticipants(latestUnusedId);
@@ -47,16 +48,17 @@ contract QFPool is Ownable {
 				i++;
 			}
 		}
+		thisBalances[_token] = 0;
 	}
 
 	function withdrawFromFundingPool(address _token) public {
 		if (fundingPool.quadraticFundingPoolFunds(_token) > 0) {
 			thisBalances[_token] += fundingPool.qFWithdraw(_token);
+			emit NewBalance(thisBalances[_token], _token);
 		}
-
-		emit NewBalance(thisBalances[_token], _token);
 	}
 
+	/// @notice check if grant ended and still within eligible timeframe.
 	function _getTotalParticipants(uint256 latestUnusedId) internal returns (uint256 totalParticipants) {
 		uint256 i = lastStartingId;
 		while (i < latestUnusedId) {
@@ -78,8 +80,9 @@ contract QFPool is Ownable {
 	/// @notice Withdraw allocated funds for grant creator.
     function withdrawFunds(uint256 _grantId, address _token) external {
         if (_grantId >= hypercert.latestUnusedId()) revert GrantNotExist();
-        require(fundingPool.allowedTokens(_token) == true, "Token is not supported");
 		require(allotmentsByIdToken[_grantId][_token] > 0, "No Balance to withdraw");
+		require(hypercert.grantEnded(_grantId), "Round not ended");
+		if (thisBalances[_token] != 0) distributeFunds(_token);
 
 		address grantCreator = hypercert.grantOwner(_grantId);
         uint256 amount = allotmentsByIdToken[_grantId][_token];
